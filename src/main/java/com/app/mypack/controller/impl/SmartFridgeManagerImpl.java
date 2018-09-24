@@ -1,11 +1,3 @@
-/**
- * SmartFridgeManagerImpl
- * M101J
- * <p>
- * Copyright (c) 2018, Apple Inc.
- * All rights reserved.
- */
-
 package com.app.mypack.controller.impl;
 
 import com.app.mypack.constants.SmartFridgeManagerConstants;
@@ -16,12 +8,14 @@ import com.app.mypack.entity.SmartFridgeItem;
 import com.app.mypack.exception.ContainerFullException;
 import com.app.mypack.exception.ItemAlreadyRemovedException;
 
+import com.app.mypack.exception.ItemCannotBeAddedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -78,10 +72,9 @@ public class SmartFridgeManagerImpl implements SmartFridgeManager {
     @Override
     public void handleItemAdded(long iItemType, String iItemUUID, String iName, Double iFillFactor) {
 
-        Double updatedFillFactor = getCurrentFillFactorOfThisItemType(iItemType);
         LocalDateTime itemAddedDateTime = LocalDateTime.now(ZoneId.of("GMT+0"));
         SmartFridgeItem smartFridgeItem =
-                new SmartFridgeItem(iItemUUID,iItemType,iName,updatedFillFactor,
+                new SmartFridgeItem(iItemUUID,iItemType,iName,iFillFactor,
                         SmartFridgeManagerConstants.SmartFridgeItemType.ONETYPE,true,itemAddedDateTime,itemAddedDateTime);
 
 
@@ -89,18 +82,19 @@ public class SmartFridgeManagerImpl implements SmartFridgeManager {
         ItemContainer itemContainer = smartFridgeContainerRepoMap.get(itemContainerIndex);
         try {
             if(null == itemContainer) {
-                itemContainer = new ItemContainer(itemContainerIndex+1, SmartFridgeManagerConstants.ContainerType.ONETYPE, 10);
+                itemContainer = new ItemContainer(itemContainerIndex, SmartFridgeManagerConstants.ContainerType.ONETYPE, 10);
             }
             itemContainer.addItemToContainer(smartFridgeItem);
-        } catch(ContainerFullException iE) {
-            LOGGER.info("message= \"Chosen container is full, need to place new container\"");
-            itemContainer = new ItemContainer(itemContainerIndex+1, SmartFridgeManagerConstants.ContainerType.ONETYPE, 10);
+        } catch(ContainerFullException | ItemCannotBeAddedException iE) {
+            LOGGER.info("message= \"Chosen container cannot have this item, need to place new container\"");
+            itemContainer = new ItemContainer(++itemContainerIndex, SmartFridgeManagerConstants.ContainerType.ONETYPE, 10);
             itemContainer.addItemToContainer(smartFridgeItem);
         }
-
         smartFridgeContainerRepoMap.put(itemContainerIndex,itemContainer);
-        smartFridgeItemTypeContainerIdsRepoMap.get(iItemType).add(itemContainerIndex);
+        smartFridgeItemTypeContainerIdsRepoMap.compute(iItemType,(k,v) -> (v==null) ? new HashSet<>():v).add(itemContainerIndex);
         smartFridgeItemHashMap.put(iItemUUID, smartFridgeItem);
+
+        updateFillFactorForItemType(smartFridgeItem.getItemType());
     }
 
     /**
@@ -150,6 +144,7 @@ public class SmartFridgeManagerImpl implements SmartFridgeManager {
     public void forgetItem(long iItemType) {
 
         smartFridgeItemTypeContainerIdsRepoMap.remove(iItemType);
+        smartFridgeContainerRepoMap.entrySet().removeIf(iIntegerItemContainerEntry -> iIntegerItemContainerEntry.getKey() == iItemType);
         smartFridgeItemHashMap.entrySet().removeIf(iStringSmartFridgeItemEntry -> iStringSmartFridgeItemEntry.getValue().getItemType() == iItemType);
 
     }
@@ -168,27 +163,28 @@ public class SmartFridgeManagerImpl implements SmartFridgeManager {
                     .stream()
                     .mapToInt(i -> i)
                     .max()
-                    .orElse(0);
+                    .orElse(1);
         }
         return itemContainerIndex;
     }
 
-    //TODO revisit
+
     private Double getCurrentFillFactorOfThisItemType (Long iItemType) {
 
         if(null == iItemType) {
-            return Double.MIN_VALUE;
+            return 0.0;
         }
 
         Set<Integer> containersOfItemType = smartFridgeItemTypeContainerIdsRepoMap.get(iItemType);
 
         if(null != containersOfItemType) {
-            return smartFridgeItemTypeContainerIdsRepoMap.get(iItemType).stream()
+            return containersOfItemType.stream()
                     .filter(iItemContainerId -> !smartFridgeContainerRepoMap.get(iItemContainerId).isEmpty())
-                    .map(iItemContainerId -> smartFridgeContainerRepoMap.get(iItemContainerId).currentItemsCount())
-                    .collect(Collectors.toList()).stream().mapToInt(i -> i).summaryStatistics().getAverage();
+                    .map(iItemContainerId -> smartFridgeContainerRepoMap.get(iItemContainerId).currentItemsCount()/smartFridgeContainerRepoMap.get(iItemContainerId).getSizeInUnits())
+                    .collect(Collectors.toList()).stream()
+                    .mapToInt(i -> i).summaryStatistics().getAverage();
         } else {
-            return Double.MIN_VALUE;
+            return 1.0;
         }
     }
 

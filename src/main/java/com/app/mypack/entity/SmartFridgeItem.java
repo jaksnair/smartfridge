@@ -1,11 +1,3 @@
-/**
- * SmartFridgeItem
- * M101J
- * <p>
- * Copyright (c) 2018, Apple Inc.
- * All rights reserved.
- */
-
 package com.app.mypack.entity;
 
 import com.app.mypack.constants.SmartFridgeManagerConstants;

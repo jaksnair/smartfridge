@@ -1,33 +1,21 @@
-/**
- * SmartFridgeBeanValidator
- * M101J
- * <p>
- * Copyright (c) 2018, Apple Inc.
- * All rights reserved.
- */
-
 package com.app.mypack.service.validator;
 
 import com.app.mypack.exception.SmartFridgeManagerUnExpectedException;
 import com.app.mypack.exception.ValidationFailedException;
 
 import java.lang.reflect.Field;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class SmartFridgeBeanValidator<T> {
 
-    private static final Set<Object> REGISTERED_SET = new HashSet<>();
-
-    private StringBuilder violationBuider;
+    private StringBuilder violationBuilder;
 
     private String violations;
 
     public void validate(T beanType) throws ValidationFailedException {
 
-        violationBuider = new StringBuilder();
+        violationBuilder = new StringBuilder();
 
         Field[] smartFridgeManagerFields = beanType.getClass().getDeclaredFields();
 
@@ -41,7 +29,7 @@ public class SmartFridgeBeanValidator<T> {
                 } catch (IllegalAccessException iEx) {
                     throw new SmartFridgeManagerUnExpectedException(iEx.getMessage());
                 } catch (NullPointerException iEx) {
-                    violationBuider.append(" | ").append(iEx.getMessage()).append(" | ");
+                    violationBuilder.append(" | ").append(iEx.getMessage()).append(" | ");
                 }
             }
 
@@ -68,12 +56,12 @@ public class SmartFridgeBeanValidator<T> {
                 } catch (IllegalArgumentException iEx) {
                     throw new SmartFridgeManagerUnExpectedException(iEx.getMessage());
                 } catch(ValidationFailedException iEx) {
-                    violationBuider.append(" | ").append(iEx.getMessage()).append(" | ");
+                    violationBuilder.append(" | ").append(iEx.getMessage()).append(" | ");
                 }
             }
         }
 
-        violations = violationBuider.toString();
+        violations = violationBuilder.toString();
 
         if(!violations.isEmpty()) {
             throw new ValidationFailedException(violations);

@@ -87,6 +87,14 @@ public class ItemContainer {
                     + " and Item Container can have only " + containerType.getType());
         }
 
+
+        if(!isEmpty()) {
+            long containerItemType = smartFridgeItemSet.stream().findFirst().get().getItemType();
+            if(containerItemType != iSmartFridgeItem.getItemType()) {
+                throw new ItemCannotBeAddedException("Item type of given item is " + iSmartFridgeItem.getItemType()
+                        + " and Item Container can have only " + containerItemType);
+            }
+        }
         smartFridgeItemSet.add(iSmartFridgeItem);
 
     }
